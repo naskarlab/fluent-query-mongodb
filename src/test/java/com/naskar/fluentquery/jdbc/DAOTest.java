@@ -5,8 +5,11 @@ package com.naskar.fluentquery.jdbc;
 //import static com.mongodb.client.model.Filters.lt;
 
 import java.util.Arrays;
+import java.util.List;
 
+import org.bson.Document;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -25,11 +28,15 @@ public class DAOTest {
 	
 	@Before
 	public void setup() throws Exception {
-		
+				
 		client = new MongoClient(
 		  Arrays.asList(new ServerAddress("localhost", 27017)));
 
 		MongoDatabase database = client.getDatabase("testdb");
+		
+		// clean
+		database.getCollection(Customer.class.getSimpleName())
+			.deleteMany(new Document());
 		
 		dao = new DAOImpl(new DatabaseProvider() {
 			
@@ -49,19 +56,21 @@ public class DAOTest {
 	@Test
 	public void testSuccessInsertQuery() {
 		dao.execute(dao.insert(Customer.class)
-				.value(i -> i.getId()).set(1L)
 				.value(i -> i.getName()).set("teste1"));
 		
-//		List<Customer> actual = dao.list(dao.query(Customer.class)
-//			.where(i -> i.getName()).like("t%"));
-//		
-//		Assert.assertEquals(actual.size(), 2);
-//		
-//		Assert.assertEquals((long)actual.get(0).getId(), 1L);
-//		Assert.assertEquals((long)actual.get(1).getId(), 2L);
-//		
-//		Assert.assertEquals(actual.get(0).getName(), "teste1");
-//		Assert.assertEquals(actual.get(1).getName(), "teste2");
+		dao.execute(dao.insert(Customer.class)
+				.value(i -> i.getName()).set("teste2"));
+		
+		List<Customer> actual = dao.list(dao.query(Customer.class)
+			.where(i -> i.getName()).like("t%"));
+		
+		Assert.assertEquals(actual.size(), 2);
+		
+		Assert.assertNotNull(actual.get(0).getId());
+		Assert.assertNotNull(actual.get(1).getId());
+		
+		Assert.assertEquals(actual.get(0).getName(), "teste1");
+		Assert.assertEquals(actual.get(1).getName(), "teste2");
 	}
 	
 //	@Test

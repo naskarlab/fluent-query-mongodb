@@ -1,10 +1,13 @@
 package com.naskar.fluentquery.mongodb;
 
+import java.util.List;
+
 import com.naskar.fluentquery.Into;
+import com.naskar.fluentquery.Query;
 
 public interface DAO {
 	
-//	<T> Query<T> query(Class<T> clazz);
+	<T> Query<T> query(Class<T> clazz);
 //	
 //	<T> T single(Query<T> query);
 //	
@@ -18,7 +21,7 @@ public interface DAO {
 //	
 //	<T> Delete<T> delete(Class<T> clazz);
 //	
-//	<T> List<T> list(Query<T> query);
+	<T> List<T> list(Query<T> query);
 //	
 //	<T, R> List<R> list(Query<T> query, Class<R> clazz);
 //	
@@ -27,9 +30,7 @@ public interface DAO {
 //	void list(String sql, List<Object> params, ResultSetHandler handler);
 //	
 	<T> void execute(Into<T> into);
-//	
-//	<T> void execute(Into<T> into, ResultSetHandler handlerKeys);
-//	
+	
 //	<T> void execute(Update<T> update);
 //	
 //	<T> void execute(Delete<T> delete);

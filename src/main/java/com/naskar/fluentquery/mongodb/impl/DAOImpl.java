@@ -1,26 +1,32 @@
 package com.naskar.fluentquery.mongodb.impl;
 
-import java.util.logging.Logger;
+import java.util.List;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.naskar.fluentquery.InsertBuilder;
 import com.naskar.fluentquery.Into;
-import com.naskar.fluentquery.conventions.MappingConvention;
-import com.naskar.fluentquery.mapping.MappingValueProvider;
+import com.naskar.fluentquery.Query;
+import com.naskar.fluentquery.QueryBuilder;
 import com.naskar.fluentquery.mongodb.DAO;
 import com.naskar.fluentquery.mongodb.DatabaseProvider;
+import com.naskar.fluentquery.mongodb.DocumentHandler;
 import com.naskar.fluentquery.mongodb.converters.MongoInsertInto;
+import com.naskar.fluentquery.mongodb.converters.MongoQuery;
 import com.naskar.fluentquery.mongodb.converters.MongoResult;
+import com.naskar.fluentquery.mongodb.impl.ClassListHandler.Converter;
 
 public class DAOImpl implements DAO {
 	
-	private static final Logger logger = Logger.getLogger(DAOImpl.class.getName());
+//	private static final Logger logger = Logger.getLogger(DAOImpl.class.getName());
 	
 	private DatabaseProvider databaseProvider;
 	
-//	private NativeSQL nativeSQL;
-//	private QueryBuilder queryBuilder;
+	private MongoQuery mongoQuery;
+	private QueryBuilder queryBuilder;
 //	
 	private MongoInsertInto insert;
 	private InsertBuilder insertBuilder;
@@ -36,9 +42,8 @@ public class DAOImpl implements DAO {
 	public DAOImpl(DatabaseProvider databaseProvider) {
 		this.databaseProvider = databaseProvider;
 		
-//		this.nativeSQL = new NativeSQL();
-//		this.nativeSQL.setConvention(mappings);
-//		this.queryBuilder = new QueryBuilder();
+		this.mongoQuery = new MongoQuery();
+		this.queryBuilder = new QueryBuilder();
 		
 		this.insert = new MongoInsertInto();
 		this.insertBuilder = new InsertBuilder();
@@ -54,10 +59,10 @@ public class DAOImpl implements DAO {
 //		this.binderBuilder = new BinderSQLBuilder();
 	}
 	
-//	@Override
-//	public <T> Query<T> query(Class<T> clazz) {
-//		return queryBuilder.from(clazz);
-//	}
+	@Override
+	public <T> Query<T> query(Class<T> clazz) {
+		return queryBuilder.from(clazz);
+	}
 //	
 //	@Override
 //	public <T> T single(Query<T> query) {
@@ -71,51 +76,46 @@ public class DAOImpl implements DAO {
 //		return o;
 //	}
 //	
-//	@Override
-//	public <T> List<T> list(Query<T> query) {
-//		NativeSQLResult result = query.to(nativeSQL);
-//		
-//		final List<T> l = new ArrayList<T>();
-//		
-//		list(result.sqlValues(), result.values(), (ResultSet rs) -> {
-//							
-//			try {
-//				MappingValueProvider<T> map = (MappingValueProvider<T>) mappings.get(query.getClazz());
-//				if(map == null) {
-//					throw new IllegalArgumentException("No mapping for: " + query.getClazz().getName());
-//				}
-//				
-//				T t = query.getClazz().newInstance();
-//				
-//				map.fill(t, new ValueProvider() {
-//					
-//					@Override
-//					public <R> R get(String name, Class<R> clazz) {
-//						try {
-//							if(resultSetConverter == null) {
-//								return rs.getObject(name, clazz);
-//							} else {
-//								return resultSetConverter.converter(rs, name, clazz);
-//							}
-//						} catch(Exception e) {
-//							throw new RuntimeException(e);
-//						}
-//					}
-//					
-//				});
-//				
-//				l.add(t);
-//				
-//				return true;
-//			} catch(Exception e) {
-//				throw new RuntimeException(e);
-//			}
-//			
-//		});
-//		
-//		return l;
-//	}
-//	
+	@Override
+	public <T> List<T> list(Query<T> query) {
+		// TODO: performance cache
+		ClassListHandler<T> handler = new ClassListHandler<T>(query.getClazz());
+		handler.addAlias("_id", "id");
+		handler.addConverter("id", new Converter() {
+			
+			@Override
+			public Object to(Object value) {
+				Object r = value;
+				if(r instanceof ObjectId) {
+					r = ((ObjectId)value).toString();
+				}
+				return r;
+			}
+		});
+		
+		list(query, handler);
+		return handler.getList();
+	}
+		
+	private <T> void list(Query<T> query, DocumentHandler handler) {
+		MongoResult result = query.to(mongoQuery);
+		
+		MongoCollection<Document> collection = this.databaseProvider.getDatabase()
+			.getCollection(result.getCollection());
+		
+		try (MongoCursor<Document> cursor = collection.find(result.getObject()).iterator()) {
+			forEachHandler(handler, cursor);
+		}
+	}
+	
+	private void forEachHandler(DocumentHandler handler, MongoCursor<Document> cursor) {
+		while(cursor.hasNext()) {
+			if(!handler.next(cursor.next())) {
+				break;
+			}
+		}
+	}
+	
 	@Override
 	public <T> Into<T> insert(Class<T> clazz) {
 		return insertBuilder.into(clazz);
@@ -223,6 +223,7 @@ public class DAOImpl implements DAO {
 	@Override
 	public <T> void execute(Into<T> into) {
 		MongoResult result = into.to(insert);
+		result.getObject().remove("id");
 		this.databaseProvider.getDatabase()
 			.getCollection(result.getCollection())
 			.insertOne(new Document(result.getObject()));

@@ -1,53 +1,57 @@
 package com.naskar.fluentquery.mongodb.converters;
 
-import org.bson.Document;
+import com.mongodb.BasicDBObject;
 
 public class MongoParts {
 
-	private Document select;
-	private Document from;
-	private Document where;
-	private Document groupBy;
-	private Document orderBy;
+	private BasicDBObject select;
+	private BasicDBObject from;
+	private BasicDBObject where;
+	private BasicDBObject groupBy;
+	private BasicDBObject orderBy;
 	
 	public MongoParts() {
-		this.select = new Document();
-		this.from = new Document();
-		this.where = new Document();
-		this.groupBy = new Document();
-		this.orderBy = new Document();
+		this.select = new BasicDBObject();
+		this.from = new BasicDBObject();
+		this.where = new BasicDBObject();
+		this.groupBy = new BasicDBObject();
+		this.orderBy = new BasicDBObject();
 	}
 
-	public Document getSelect() {
+	public BasicDBObject getSelect() {
 		return select;
 	}
 
-	public Document getFrom() {
+	public BasicDBObject getFrom() {
 		return from;
 	}
 
-	public Document getWhere() {
+	public BasicDBObject getWhere() {
 		return where;
 	}
 	
-	public Document getGroupBy() {
+	public BasicDBObject getGroupBy() {
 		return groupBy;
 	}
 	
-	public Document getOrderBy() {
+	public BasicDBObject getOrderBy() {
 		return orderBy;
 	}
 	
+	public boolean hasSelect() {
+		return !select.keySet().isEmpty();
+	}
+	
 	public boolean hasWhere() {
-		return !where.isEmpty();
+		return !where.keySet().isEmpty();
 	}
 	
 	public boolean hasGroupBy() {
-		return !groupBy.isEmpty();
+		return !groupBy.keySet().isEmpty();
 	}
 	
 	public boolean hasOrderBy() {
-		return !orderBy.isEmpty();
+		return !orderBy.keySet().isEmpty();
 	}
 
 }

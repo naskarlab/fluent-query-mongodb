@@ -6,6 +6,7 @@ public class MongoResult {
 
 	private String collection;
 	private BasicDBObject object = new BasicDBObject();
+	private BasicDBObject fields = new BasicDBObject();
 
 	public String getCollection() {
 		return collection;
@@ -18,5 +19,17 @@ public class MongoResult {
 	public BasicDBObject getObject() {
 		return object;
 	}
-	
+
+	public BasicDBObject getFields() {
+		return fields;
+	}
+
+	public void setFields(BasicDBObject fields) {
+		this.fields = fields;
+	}
+
+	public void setObject(BasicDBObject object) {
+		this.object = object;
+	}
+		
 }
