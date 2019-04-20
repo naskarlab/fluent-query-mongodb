@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.mongodb.BasicDBObject;
+import org.bson.Document;
+
 import com.naskar.fluentquery.converters.PredicateProvider;
 import com.naskar.fluentquery.impl.Convention;
 import com.naskar.fluentquery.impl.MethodRecordProxy;
@@ -19,19 +20,23 @@ public class MongoWhereImpl {
 		this.convention = convention;
 	}
 	
+	public Convention getConvention() {
+		return convention;
+	}
+	
 	public <T, I, B> void convertWhere(
-			BasicDBObject object,
+			Document object,
 			MethodRecordProxy<T> proxy,
 			List<PredicateImpl<T, Object, I, B>> predicates) {
 		
-		List<List<BasicDBObject>> conditions = new ArrayList<List<BasicDBObject>>();
+		List<List<Document>> conditions = new ArrayList<List<Document>>();
 		List<Type> conditionTypes = new ArrayList<Type>();
 		
 		predicates.stream().forEach(p -> {
 			
 			if(p.getType() == Type.SPEC_AND || p.getType() == Type.SPEC_OR) {
 				
-				BasicDBObject filter = new BasicDBObject();
+				Document filter = new Document();
 				
 				@SuppressWarnings("unchecked")
 				PredicateProvider<T, B> q = ((PredicateProvider<T, B>)p.getProperty().apply(null));
@@ -50,7 +55,7 @@ public class MongoWhereImpl {
 				
 				p.getActions().forEach(action -> {
 					
-					BasicDBObject filter = new BasicDBObject();
+					Document filter = new Document();
 					
 					MongoPredicate<T, Object, I> predicate = new MongoPredicate<T, Object, I>(name, filter);
 					action.accept(predicate);
@@ -69,7 +74,7 @@ public class MongoWhereImpl {
 		}
 	}
 
-	private void appendType(BasicDBObject object, Type t, List<BasicDBObject> filters) {
+	private void appendType(Document object, Type t, List<Document> filters) {
 		if(Type.AND == t || Type.SPEC_AND == t) {
 			object.append("$and", filters);
 			

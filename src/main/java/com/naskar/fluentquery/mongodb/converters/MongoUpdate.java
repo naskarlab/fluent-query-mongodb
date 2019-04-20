@@ -10,56 +10,62 @@ import com.naskar.fluentquery.Into;
 import com.naskar.fluentquery.Value;
 import com.naskar.fluentquery.conventions.SimpleConvention;
 import com.naskar.fluentquery.impl.Convention;
-import com.naskar.fluentquery.impl.IntoConverter;
-import com.naskar.fluentquery.impl.IntoImpl;
 import com.naskar.fluentquery.impl.MethodRecordProxy;
 import com.naskar.fluentquery.impl.Tuple;
 import com.naskar.fluentquery.impl.TypeUtils;
+import com.naskar.fluentquery.impl.UpdateConverter;
+import com.naskar.fluentquery.impl.UpdateImpl;
 import com.naskar.fluentquery.impl.ValueImpl;
 
-public class MongoInsertInto implements IntoConverter<MongoInsertResult> {
+public class MongoUpdate implements UpdateConverter<MongoUpdateResult> {
 	
 	private Convention convention;
 	
-	public MongoInsertInto(Convention convention) {
+	private MongoWhereImpl mongoWhereImpl;
+	
+	public MongoUpdate(Convention convention) {
 		this.convention = convention;
+		this.mongoWhereImpl = new MongoWhereImpl();
+		this.mongoWhereImpl.setConvention(convention);
 	}
 	
-	public MongoInsertInto() {
+	public MongoUpdate() {
 		this(new SimpleConvention());
 	}
 	
-	public MongoInsertInto setConvention(Convention convention) {
+	public MongoUpdate setConvention(Convention convention) {
 		this.convention = convention;
+		this.mongoWhereImpl.setConvention(convention);
 		return this;
 	}
 	
 	public Convention getConvention() {
 		return convention;
 	}
-	
+			
 	@Override
-	public <T> MongoInsertResult convert(IntoImpl<T> intoImpl) {
-		MongoInsertResult result = new MongoInsertResult();
+	public <T> MongoUpdateResult convert(UpdateImpl<T> updateImpl) {
+		MongoUpdateResult result = new MongoUpdateResult();
 		
-		convert(intoImpl, result);
-		
+		convert(updateImpl, result);
+				
 		return result;
 	}
 	
-	private <T> void convert(IntoImpl<T> intoImpl, MongoInsertResult result) {
-		MethodRecordProxy<T> proxy = TypeUtils.createProxy(intoImpl.getClazz());
-		convertInto(result, intoImpl.getClazz());
-		convertNameValue(result.getValue(), proxy, intoImpl.getValues());		
+	private <T> void convert(UpdateImpl<T> updateImpl, MongoUpdateResult result) {
+		MethodRecordProxy<T> proxy = TypeUtils.createProxy(updateImpl.getClazz());
+		convertFrom(result, updateImpl.getClazz());
+		convertNameValue(result.getValues(), proxy, updateImpl.getValues());
+		mongoWhereImpl.convertWhere(result.getFilter(), proxy, updateImpl.getPredicates());
 	}
 
-	private <T> void convertInto(MongoInsertResult result, Class<T> clazz) {
+	private <T> void convertFrom(MongoUpdateResult result, Class<T> clazz) {
 		result.setCollection(convention.getNameFromClass(clazz));
 	}
 	
 	@SuppressWarnings("unchecked")
 	private <T> void convertNameValue(
-		Document valueDoc, 
+		Document update, 
 		MethodRecordProxy<T> proxy,
 		List<Tuple<Function<T, ?>, Value<Into<T>, ?>>> values
 	) {
@@ -75,7 +81,7 @@ public class MongoInsertInto implements IntoConverter<MongoInsertResult> {
 			
 			String name = convention.getNameFromMethod(m);
 			
-			valueDoc.append(name, value);
+			update.append(name, value);
 			
 		});
 	}

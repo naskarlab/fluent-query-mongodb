@@ -1,11 +1,8 @@
 package com.naskar.fluentquery.jdbc;
 
-//import static com.mongodb.client.model.Filters.and;
-//import static com.mongodb.client.model.Filters.gt;
-//import static com.mongodb.client.model.Filters.lt;
-
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import org.bson.Document;
 import org.junit.After;
@@ -54,23 +51,78 @@ public class DAOTest {
 	}
 	
 	@Test
-	public void testSuccessInsertQuery() {
+	public void testSuccessInsert() {
+		// Arrange
 		dao.execute(dao.insert(Customer.class)
+				.value(x -> x.getId()).set(UUID.randomUUID().toString())
 				.value(i -> i.getName()).set("teste1"));
 		
 		dao.execute(dao.insert(Customer.class)
+				.value(x -> x.getId()).set(UUID.randomUUID().toString())
 				.value(i -> i.getName()).set("teste2"));
 		
+		// Act
 		List<Customer> actual = dao.list(dao.query(Customer.class)
 			.where(i -> i.getName()).like("t%"));
 		
-		Assert.assertEquals(actual.size(), 2);
+		// Assert
+		Assert.assertEquals(2, actual.size());
 		
 		Assert.assertNotNull(actual.get(0).getId());
 		Assert.assertNotNull(actual.get(1).getId());
 		
-		Assert.assertEquals(actual.get(0).getName(), "teste1");
-		Assert.assertEquals(actual.get(1).getName(), "teste2");
+		Assert.assertEquals("teste1", actual.get(0).getName());
+		Assert.assertEquals("teste2", actual.get(1).getName());
+	}
+	
+	@Test
+	public void testSuccessUpdate() {
+		// Arrange
+		String id = dao.execute(dao.insert(Customer.class)
+			.value(x -> x.getId()).set(UUID.randomUUID().toString())
+			.value(i -> i.getName()).set("teste1")
+		);
+		
+		// Act
+		dao.execute(
+			dao.update(Customer.class)
+				.value(i -> i.getName()).set("teste1-updated")
+				.where(i -> i.getId()).eq(id)
+		);
+		
+		List<Customer> actual = dao.list(dao.query(Customer.class)
+			.where(i -> i.getId()).eq(id)
+		);
+		
+		// Assert
+		Assert.assertEquals(1, actual.size());
+		Assert.assertEquals("teste1-updated", actual.get(0).getName());
+	}
+	
+	@Test
+	public void testSuccessDelete() {
+		// Arrange
+		String id = dao.execute(dao.insert(Customer.class)
+			.value(x -> x.getId()).set(UUID.randomUUID().toString())
+			.value(i -> i.getName()).set("teste1")
+		);
+		
+		List<Customer> l = dao.list(dao.query(Customer.class)
+			.where(i -> i.getId()).eq(id)
+		);
+		
+		// Act
+		dao.execute(dao.delete(Customer.class)
+			.where(i -> i.getId()).eq(id)
+		);
+		
+		// Assert
+		List<Customer> actual = dao.list(dao.query(Customer.class)
+			.where(i -> i.getId()).eq(id)
+		);
+		
+		Assert.assertEquals(1, l.size());
+		Assert.assertEquals(0, actual.size());
 	}
 	
 //	@Test

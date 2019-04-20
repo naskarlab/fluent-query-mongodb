@@ -1,61 +1,81 @@
 package com.naskar.fluentquery.mongodb.impl;
 
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 import org.bson.Document;
-import org.bson.types.ObjectId;
 
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
+import com.naskar.fluentquery.Delete;
+import com.naskar.fluentquery.DeleteBuilder;
 import com.naskar.fluentquery.InsertBuilder;
 import com.naskar.fluentquery.Into;
 import com.naskar.fluentquery.Query;
 import com.naskar.fluentquery.QueryBuilder;
+import com.naskar.fluentquery.Update;
+import com.naskar.fluentquery.UpdateBuilder;
 import com.naskar.fluentquery.mongodb.DAO;
 import com.naskar.fluentquery.mongodb.DatabaseProvider;
 import com.naskar.fluentquery.mongodb.DocumentHandler;
+import com.naskar.fluentquery.mongodb.converters.MongoDelete;
+import com.naskar.fluentquery.mongodb.converters.MongoDeleteResult;
 import com.naskar.fluentquery.mongodb.converters.MongoInsertInto;
+import com.naskar.fluentquery.mongodb.converters.MongoInsertResult;
 import com.naskar.fluentquery.mongodb.converters.MongoQuery;
-import com.naskar.fluentquery.mongodb.converters.MongoResult;
-import com.naskar.fluentquery.mongodb.impl.ClassListHandler.Converter;
+import com.naskar.fluentquery.mongodb.converters.MongoQueryResult;
+import com.naskar.fluentquery.mongodb.converters.MongoUpdate;
+import com.naskar.fluentquery.mongodb.converters.MongoUpdateResult;
 
 public class DAOImpl implements DAO {
 	
-//	private static final Logger logger = Logger.getLogger(DAOImpl.class.getName());
+	private static final Logger logger = Logger.getLogger(DAOImpl.class.getName());
 	
 	private DatabaseProvider databaseProvider;
+	private ObjectIdConverter objectIdConverter;
 	
 	private MongoQuery mongoQuery;
 	private QueryBuilder queryBuilder;
-//	
-	private MongoInsertInto insert;
+
+	private MongoInsertInto mongoInsert;
 	private InsertBuilder insertBuilder;
-//	
-//	private NativeSQLUpdate updateSQL;
-//	private UpdateBuilder updateBuilder;
-//	
-//	private NativeSQLDelete deleteSQL;
-//	private DeleteBuilder deleteBuilder;
-//	
+	
+	private MongoUpdate mongoUpdate;
+	private UpdateBuilder updateBuilder;
+	
+	private MongoDelete mongoDelete;
+	private DeleteBuilder deleteBuilder;
+	
 //	private BinderSQLBuilder binderBuilder;
 	
 	public DAOImpl(DatabaseProvider databaseProvider) {
 		this.databaseProvider = databaseProvider;
+		this.objectIdConverter = new ObjectIdConverter();
 		
 		this.mongoQuery = new MongoQuery();
+		this.mongoQuery.setConvention(new MongoConvention(this.mongoQuery.getConvention())
+				.alias("id", "_id"));
 		this.queryBuilder = new QueryBuilder();
 		
-		this.insert = new MongoInsertInto();
+		this.mongoInsert = new MongoInsertInto();
+		this.mongoInsert.setConvention(new MongoConvention(this.mongoInsert.getConvention())
+				.alias("id", "_id"));
 		this.insertBuilder = new InsertBuilder();
 		
-//		this.updateSQL = new NativeSQLUpdate();
-//		this.updateSQL.setConvention(mappings);
-//		this.updateBuilder = new UpdateBuilder();
-//		
-//		this.deleteSQL = new NativeSQLDelete();
-//		this.deleteSQL.setConvention(mappings);
-//		this.deleteBuilder = new DeleteBuilder();
-//		
+		this.mongoUpdate = new MongoUpdate();
+		this.mongoUpdate.setConvention(new MongoConvention(this.mongoUpdate.getConvention())
+				.alias("id", "_id"));
+		this.updateBuilder = new UpdateBuilder();
+		
+		this.mongoDelete = new MongoDelete();
+		this.mongoDelete.setConvention(new MongoConvention(this.mongoDelete.getConvention())
+				.alias("id", "_id"));
+		this.deleteBuilder = new DeleteBuilder();
+		
 //		this.binderBuilder = new BinderSQLBuilder();
 	}
 	
@@ -63,47 +83,56 @@ public class DAOImpl implements DAO {
 	public <T> Query<T> query(Class<T> clazz) {
 		return queryBuilder.from(clazz);
 	}
-//	
-//	@Override
-//	public <T> T single(Query<T> query) {
-//		T o = null;
-//		
-//		List<T> l = list(query);
-//		if(l != null && !l.isEmpty()) {
-//			o = l.get(0);
-//		}
-//		
-//		return o;
-//	}
-//	
+	
 	@Override
-	public <T> List<T> list(Query<T> query) {
-		// TODO: performance cache
+	public <T> T single(Query<T> query) {
+		T o = null;
+		
 		ClassListHandler<T> handler = new ClassListHandler<T>(query.getClazz());
 		handler.addAlias("_id", "id");
-		handler.addConverter("id", new Converter() {
-			
-			@Override
-			public Object to(Object value) {
-				Object r = value;
-				if(r instanceof ObjectId) {
-					r = ((ObjectId)value).toString();
-				}
-				return r;
-			}
+		handler.addConverter("id", objectIdConverter);
+		list(query, handler, (find) -> {
+			find.limit(1);
 		});
+		List<T> l = handler.getList();
+		 
+		if(l != null && !l.isEmpty()) {
+			o = l.get(0);
+		}
 		
-		list(query, handler);
+		logger.info(" single " + o);
+		
+		return o;
+	}
+	
+	@Override
+	public <T> List<T> list(Query<T> query) {
+		ClassListHandler<T> handler = new ClassListHandler<T>(query.getClazz());
+		handler.addAlias("_id", "id");
+		handler.addConverter("id", objectIdConverter);
+		list(query, handler, null);
+		logger.info(" list " + handler.getList().size());
 		return handler.getList();
 	}
 		
-	private <T> void list(Query<T> query, DocumentHandler handler) {
-		MongoResult result = query.to(mongoQuery);
+	private <T> void list(Query<T> query, DocumentHandler handler, 
+			Consumer<FindIterable<Document>> action) {
+		MongoQueryResult result = query.to(mongoQuery);
 		
-		MongoCollection<Document> collection = this.databaseProvider.getDatabase()
-			.getCollection(result.getCollection());
+		String collection = result.getCollection();
+		Document filter = result.getFilter();
+		logger.info(collection + " find " + filter.toJson());
 		
-		try (MongoCursor<Document> cursor = collection.find(result.getObject()).iterator()) {
+		MongoCollection<Document> mongoCollection = 
+			this.databaseProvider.getDatabase()
+			.getCollection(collection);
+		
+		FindIterable<Document> find = mongoCollection.find(filter);
+		if(action != null) {
+			action.accept(find);
+		}
+		
+		try (MongoCursor<Document> cursor = find.iterator()) {			
 			forEachHandler(handler, cursor);
 		}
 	}
@@ -120,17 +149,17 @@ public class DAOImpl implements DAO {
 	public <T> Into<T> insert(Class<T> clazz) {
 		return insertBuilder.into(clazz);
 	}
-//	
-//	@Override
-//	public <T> Update<T> update(Class<T> clazz) {
-//		return updateBuilder.entity(clazz);
-//	}
-//	
-//	@Override
-//	public <T> Delete<T> delete(Class<T> clazz) {
-//		return deleteBuilder.entity(clazz);
-//	}
-//	
+	
+	@Override
+	public <T> Update<T> update(Class<T> clazz) {
+		return updateBuilder.entity(clazz);
+	}
+	
+	@Override
+	public <T> Delete<T> delete(Class<T> clazz) {
+		return deleteBuilder.entity(clazz);
+	}
+	
 //	@Override
 //	public <R> BinderSQL<R> binder(Class<R> clazz) {	
 //		return binderBuilder.from(clazz);
@@ -141,183 +170,59 @@ public class DAOImpl implements DAO {
 //		binder.configure(into.to(insertSQL));
 //	}
 //	
-//	@Override
-//	public <T, R> List<R> list(Query<T> query, Class<R> clazz) {
-//		ClassListHandler<R> handler = new ClassListHandler<R>(clazz);
-//		list(query, handler);
-//		return handler.getList();
-//	}
-//	
-//	@Override
-//	public <T> void list(Query<T> query, ResultSetHandler handler) {
-//		NativeSQLResult result = query.to(nativeSQL);
-//		list(result.sqlValues(), result.values(), handler);
-//	}
-//	
-//	@Override
-//	public void list(String sql, List<Object> params, ResultSetHandler handler) {
-//		/*
-//		PreparedStatement st = null;
-//		ResultSet rs = null;
-//		try {
-//			st = connectionProvider.getConnection()
-//					.prepareStatement(sql);
-//			
-//			addParams(st, params);
-//			
-//			logger.info("SQL:" + sql + "\nParams:" + params);
-//			
-//			rs = st.executeQuery();
-//			
-//			forEachHandler(handler, rs);
-//			
-//		} catch(Exception e) {
-//			logger.log(Level.SEVERE, "SQL:" + sql + "\nParams:" + params, e);
-//			throw new RuntimeException(e);
-//			
-//		} finally {
-//			
-//			if(rs != null) {
-//				try {
-//					rs.close();
-//				} catch(Exception e) {
-//					logger.log(Level.SEVERE, "Error on close ResultSet.", e);
-//				}
-//			}
-//			if(st != null) {
-//				try {
-//					st.close();
-//				} catch(Exception e) {
-//					logger.log(Level.SEVERE, "Error on close Statement.", e);
-//				}
-//			}
-//		}
-//		*/
-//	}
-//
-//	private void addParams(PreparedStatement st, List<Object> params) throws SQLException {
-//		if(params != null) {
-//			for(int i = 0; i < params.size(); i++) {
-//				Object o = params.get(i);
-//				if(o instanceof Date) {
-//					st.setTimestamp(i + 1, new java.sql.Timestamp(((java.util.Date)o).getTime()));
-//				} else if(o instanceof File) {
-//					try {
-//						st.setBinaryStream(i + 1, new FileInputStream((File)o));
-//					} catch(Exception e) {
-//						throw new RuntimeException(e);
-//					}
-//				} else if(o instanceof InputStream) {
-//					try {
-//						st.setBinaryStream(i + 1, (InputStream)o);
-//					} catch(Exception e) {
-//						throw new RuntimeException(e);
-//					}				
-//				} else {
-//					st.setObject(i + 1, o);
-//				}
-//			}
-//		}
-//	}
-//	
+
 	@Override
-	public <T> void execute(Into<T> into) {
-		MongoResult result = into.to(insert);
-		result.getObject().remove("id");
+	public <T> String execute(Into<T> into) {
+		MongoInsertResult result = into.to(mongoInsert);
+		
+		String collection = result.getCollection();
+		Document doc = result.getValue();
+		logger.info(collection + " insert " + doc.toJson());
+		
 		this.databaseProvider.getDatabase()
-			.getCollection(result.getCollection())
-			.insertOne(new Document(result.getObject()));
+			.getCollection(collection)
+			.insertOne(doc);
+		
+		String id = doc.get("_id").toString();
+		logger.info(collection + " insert " + id);
+		return id;
 	}
-//	
-//	@Override
-//	public <T> void execute(Into<T> into, ResultSetHandler handlerKeys) {
-//		NativeSQLResult result = into.to(insertSQL);
-//		execute(result.sqlValues(), result.values(), handlerKeys);
-//	}
-//	
-//	@Override
-//	public <T> void execute(Update<T> update) {
-//		NativeSQLResult result = update.to(updateSQL);
-//		execute(result.sqlValues(), result.values());
-//	}
-//	
-//	@Override
-//	public <T> void execute(Delete<T> delete) {
-//		NativeSQLResult result = delete.to(deleteSQL);
-//		execute(result.sqlValues(), result.values());
-//	}
-//	
+	
+	@Override
+	public <T> void execute(Update<T> update) {
+		MongoUpdateResult result = update.to(mongoUpdate);
+		
+		String collection = result.getCollection();
+		Document filterDoc = result.getFilter();
+		Document updateDoc = result.getUpdate();
+		logger.info(collection + " update " + filterDoc.toJson() + " " + updateDoc.toJson());
+		
+		UpdateResult r = this.databaseProvider.getDatabase()
+			.getCollection(collection)
+			.updateMany(filterDoc, updateDoc);
+		
+		logger.info(collection + " update " + r.getModifiedCount());
+	}
+	
+	@Override
+	public <T> void execute(Delete<T> delete) {
+		MongoDeleteResult result = delete.to(mongoDelete);
+		
+		String collection = result.getCollection();
+		Document filterDoc = result.getFilter();
+		logger.info(collection + " delete " + filterDoc.toJson());
+		
+		DeleteResult r = this.databaseProvider.getDatabase()
+			.getCollection(collection)
+			.deleteMany(filterDoc);
+		
+		logger.info(collection + " delete " + r.getDeletedCount());
+	}
+	
 //	@Override
 //	public <R> void execute(BinderSQL<R> binder, R r) {
 //		NativeSQLResult result = binder.bind(r);
 //		execute(result.sqlValues(), result.values());
-//	}
-//	
-//	@Override
-//	public void execute(String sql) {
-//		this.execute(sql, null, null);
-//	}
-//	
-//	@Override
-//	public void execute(String sql, List<Object> params) {
-//		this.execute(sql, params, null);
-//	}
-//	
-//	@Override
-//	public void execute(String sql, List<Object> params, ResultSetHandler handlerKeys) {
-//		/*
-//		PreparedStatement st = null;
-//		ResultSet rs = null;
-//		try {
-//			st = connectionProvider.getConnection()
-//					.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-//			
-//			addParams(st, params);
-//			
-//			logger.info("SQL:" + sql + "\nParams:" + params);
-//			
-//			int count = st.executeUpdate();
-//			
-//			logger.info("SQL: Count: " + count);
-//
-//			if(handlerKeys != null) {
-//				rs = st.getGeneratedKeys();
-//				if(rs != null) {
-//					forEachHandler(handlerKeys, rs);
-//				}
-//			}
-//			
-//		} catch(Exception e) {
-//			logger.log(Level.SEVERE, "SQL:" + sql + " params: " + params, e);
-//			throw new RuntimeException(e);
-//			
-//		} finally {
-//			
-//			if(rs != null) {
-//				try {
-//					rs.close();
-//				} catch(Exception e) {
-//					logger.log(Level.SEVERE, "Error on close ResultSet.", e);
-//				}
-//			}
-//			
-//			if(st != null) {
-//				try {
-//					st.close();
-//				} catch(Exception e) {
-//					logger.log(Level.SEVERE, "Error on close Statement.", e);
-//				}
-//			}
-//		}
-//		*/
-//	}
-//	
-//	private void forEachHandler(ResultSetHandler handler, ResultSet rs) throws SQLException {
-//		while(rs.next()) {
-//			if(!handler.next(rs)) {
-//				break;
-//			}
-//		}
 //	}
 	
 }

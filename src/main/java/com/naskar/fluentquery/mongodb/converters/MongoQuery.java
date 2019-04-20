@@ -4,7 +4,8 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Function;
 
-import com.mongodb.BasicDBObject;
+import org.bson.Document;
+
 import com.naskar.fluentquery.conventions.SimpleConvention;
 import com.naskar.fluentquery.impl.Convention;
 import com.naskar.fluentquery.impl.MethodRecordProxy;
@@ -12,7 +13,7 @@ import com.naskar.fluentquery.impl.QueryConverter;
 import com.naskar.fluentquery.impl.QueryImpl;
 import com.naskar.fluentquery.impl.TypeUtils;
 
-public class MongoQuery implements QueryConverter<MongoResult> {
+public class MongoQuery implements QueryConverter<MongoQueryResult> {
 	
 	private Convention convention;
 	
@@ -34,33 +35,28 @@ public class MongoQuery implements QueryConverter<MongoResult> {
 		return this;
 	}
 	
+	public Convention getConvention() {
+		return convention;
+	}
+	
 	@Override
-	public <T> MongoResult convert(QueryImpl<T> queryImpl) {
+	public <T> MongoQueryResult convert(QueryImpl<T> queryImpl) {
 		
-		MongoResult result = new MongoResult();
-		MongoParts parts = new MongoParts();
+		MongoQueryResult result = new MongoQueryResult();
 		
-		convert(queryImpl, parts, result);
-		
-		// TODO: parts
-		if(parts.hasSelect()) {
-			result.setFields(parts.getSelect());
-		}
-		if(parts.hasWhere()) {
-			result.setObject(parts.getWhere());
-		}
+		convert(queryImpl, result);
 		
 		return result;
 	}
 	
-	private <T> void convert(QueryImpl<T> queryImpl, MongoParts parts, MongoResult result) {
+	private <T> void convert(QueryImpl<T> queryImpl, MongoQueryResult result) {
 		MethodRecordProxy<T> proxy = TypeUtils.createProxy(queryImpl.getClazz());
 		
-		convertSelect(parts.getSelect(), proxy, queryImpl.getSelects());
+		convertSelect(result.getFields(), proxy, queryImpl.getSelects());
 		
 		convertFrom(result, queryImpl.getClazz());
 		
-		mongoWhereImpl.convertWhere(parts.getWhere(), proxy, queryImpl.getPredicates());
+		mongoWhereImpl.convertWhere(result.getFilter(), proxy, queryImpl.getPredicates());
 		
 		//convertGroupBy(parts.getGroupBy(), proxy, queryImpl.getGroups());
 		//convertOrderBy(parts.getOrderBy(), proxy, queryImpl.getOrders());
@@ -71,7 +67,7 @@ public class MongoQuery implements QueryConverter<MongoResult> {
 //			MongoParts parts, 
 //			String alias, 
 //			final HolderInt level,
-//			MongoResult result, 
+//			MongoQueryResult result, 
 //			MethodRecordProxy<T> proxy, 
 //			List<Tuple<QueryImpl<?>, Consumer<T>>> froms) {
 //		
@@ -101,7 +97,7 @@ public class MongoQuery implements QueryConverter<MongoResult> {
 //	}
 	
 	private <T> void convertSelect(
-		BasicDBObject object,
+		Document object,
 		MethodRecordProxy<T> proxy, 
 		List<Function<T, ?>> selects) {
 		
@@ -193,7 +189,7 @@ public class MongoQuery implements QueryConverter<MongoResult> {
 //		}
 //	}
 	
-	private <T> void convertFrom(MongoResult result, Class<T> clazz) {
+	private <T> void convertFrom(MongoQueryResult result, Class<T> clazz) {
 		result.setCollection(convention.getNameFromClass(clazz));
 	}
 	

@@ -1,51 +1,52 @@
 package com.naskar.fluentquery.mongodb.converters;
 
-import com.mongodb.BasicDBObject;
+import org.bson.Document;
+
 import com.naskar.fluentquery.Predicate;
 
 class MongoPredicate<T, R, I> implements Predicate<T, R, I> {
 
 	private String name;
-	private BasicDBObject object;
+	private Document object;
 	
-	public MongoPredicate(String name, BasicDBObject object) {
+	public MongoPredicate(String name, Document object) {
 		this.name = name;
 		this.object = object;
 	}
 	
 	@Override
 	public I eq(R value) {
-		object.append(name, new BasicDBObject("$eq", value));
+		object.append(name, new Document("$eq", value));
 		return null;
 	}
 	
 	@Override
 	public I ne(R value) {
-		object.append(name, new BasicDBObject("$ne", value));
+		object.append(name, new Document("$ne", value));
 		return null;
 	}
 
 	@Override
 	public I gt(R value) {
-		object.append(name, new BasicDBObject("$gt", value));
+		object.append(name, new Document("$gt", value));
 		return null;
 	}
 	
 	@Override
 	public I ge(R value) {
-		object.append(name, new BasicDBObject("$gte", value));
+		object.append(name, new Document("$gte", value));
 		return null;
 	}
 	
 	@Override
 	public I lt(R value) {
-		object.append(name, new BasicDBObject("$lt", value));
+		object.append(name, new Document("$lt", value));
 		return null;
 	}
 	
 	@Override
 	public I le(R value) {
-		object.append(name, new BasicDBObject("$lte", value));
+		object.append(name, new Document("$lte", value));
 		return null;
 	}
 	
@@ -53,7 +54,7 @@ class MongoPredicate<T, R, I> implements Predicate<T, R, I> {
 	public I like(R value) {
 		String str = value != null ? value.toString() : "";
 		str = str.replace("%", ".*");
-		object.append(name, new BasicDBObject("$regex", str));
+		object.append(name, new Document("$regex", str));
 		return null;
 	}
 	
@@ -65,7 +66,7 @@ class MongoPredicate<T, R, I> implements Predicate<T, R, I> {
 	
 	@Override
 	public I isNotNull() {
-		object.append(name, new BasicDBObject("$ne", null));
+		object.append(name, new Document("$ne", null));
 		return null;
 	}
 
