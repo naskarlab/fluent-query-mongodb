@@ -1,4 +1,4 @@
-package com.naskar.fluentquery.jdbc;
+package com.naskar.fluentquery.mongodb;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,7 +28,7 @@ public class DAOTest {
 	public void setup() throws Exception {
 				
 		client = new MongoClient(
-		  Arrays.asList(new ServerAddress("localhost", 27017)));
+			Arrays.asList(new ServerAddress("localhost", 27017)));
 
 		MongoDatabase database = client.getDatabase("testdb");
 		
@@ -36,14 +36,14 @@ public class DAOTest {
 		database.getCollection(Customer.class.getSimpleName())
 			.deleteMany(new Document());
 		
-		dao = new DAOImpl(new DatabaseProvider() {
-			
+		DatabaseProvider databaseProvider = new DatabaseProvider() {
 			@Override
 			public MongoDatabase getDatabase() {
 				return database;
 			}
-			
-		});
+		}; 
+		
+		dao = new DAOImpl(databaseProvider);
 	}
 	
 	@After
@@ -91,13 +91,13 @@ public class DAOTest {
 				.where(i -> i.getId()).eq(id)
 		);
 		
-		List<Customer> actual = dao.list(dao.query(Customer.class)
+		Customer actual = dao.single(dao.query(Customer.class)
 			.where(i -> i.getId()).eq(id)
 		);
 		
 		// Assert
-		Assert.assertEquals(1, actual.size());
-		Assert.assertEquals("teste1-updated", actual.get(0).getName());
+		Assert.assertNotNull(actual);
+		Assert.assertEquals("teste1-updated", actual.getName());
 	}
 	
 	@Test
