@@ -15,6 +15,7 @@ import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoDatabase;
 import com.naskar.fluentquery.domain.Customer;
 import com.naskar.fluentquery.mongodb.DatabaseProvider;
+import com.naskar.fluentquery.mongodb.InsertBinder;
 import com.naskar.fluentquery.mongodb.impl.DAOImpl;
 
 public class DAOTest {
@@ -123,6 +124,28 @@ public class DAOTest {
 		
 		Assert.assertEquals(1, l.size());
 		Assert.assertEquals(0, actual.size());
+	}
+
+	@Test
+	public void testSuccessBinderInsert() {
+		InsertBinder<Customer> binder = dao.binderInsert(Customer.class);
+		
+		dao.configure(binder, dao.insert(Customer.class)
+			.value(i -> i.getId()).set(binder.get(i -> i.getId()))
+			.value(i -> i.getRegionCode()).set(binder.get(i -> i.getRegionCode()))
+			.value(i -> i.getBalance()).set(binder.get(i -> i.getBalance())));
+		
+		dao.execute(binder, new Customer() {{ setId(UUID.randomUUID().toString()); setBalance(100.0); }});
+		dao.execute(binder, new Customer() {{ setId(UUID.randomUUID().toString()); setBalance(200.0); }});
+		dao.execute(binder, new Customer() {{ setId(UUID.randomUUID().toString()); setBalance(300.0); }});
+		
+		List<Customer> actual = dao.list(dao.query(Customer.class));
+		
+		Assert.assertEquals(3, actual.size());
+		
+		Assert.assertEquals(100, actual.get(0).getBalance().intValue());
+		Assert.assertEquals(200, actual.get(1).getBalance().intValue());
+		Assert.assertEquals(300, actual.get(2).getBalance().intValue());
 	}
 	
 //	@Test

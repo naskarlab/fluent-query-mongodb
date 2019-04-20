@@ -22,6 +22,8 @@ import com.naskar.fluentquery.UpdateBuilder;
 import com.naskar.fluentquery.mongodb.DAO;
 import com.naskar.fluentquery.mongodb.DatabaseProvider;
 import com.naskar.fluentquery.mongodb.DocumentHandler;
+import com.naskar.fluentquery.mongodb.InsertBinder;
+import com.naskar.fluentquery.mongodb.binders.BinderInsertBuilder;
 import com.naskar.fluentquery.mongodb.converters.MongoDelete;
 import com.naskar.fluentquery.mongodb.converters.MongoDeleteResult;
 import com.naskar.fluentquery.mongodb.converters.MongoInsertInto;
@@ -50,7 +52,7 @@ public class DAOImpl implements DAO {
 	private MongoDelete mongoDelete;
 	private DeleteBuilder deleteBuilder;
 	
-//	private BinderSQLBuilder binderBuilder;
+	private BinderInsertBuilder binderInsertBuilder;
 	
 	public DAOImpl(DatabaseProvider databaseProvider) {
 		this.databaseProvider = databaseProvider;
@@ -76,7 +78,7 @@ public class DAOImpl implements DAO {
 				.alias("id", "_id"));
 		this.deleteBuilder = new DeleteBuilder();
 		
-//		this.binderBuilder = new BinderSQLBuilder();
+		this.binderInsertBuilder = new BinderInsertBuilder();
 	}
 	
 	@Override
@@ -160,21 +162,23 @@ public class DAOImpl implements DAO {
 		return deleteBuilder.entity(clazz);
 	}
 	
-//	@Override
-//	public <R> BinderSQL<R> binder(Class<R> clazz) {	
-//		return binderBuilder.from(clazz);
-//	}
-//	
-//	@Override
-//	public <R, T> void configure(BinderSQL<R> binder, Into<T> into) {
-//		binder.configure(into.to(insertSQL));
-//	}
-//	
+	@Override
+	public <R> InsertBinder<R> binderInsert(Class<R> clazz) {
+		return binderInsertBuilder.from(clazz);
+	}
+	
+	@Override
+	public <R, T> void configure(InsertBinder<R> binder, Into<T> into) {
+		binder.configure(into.to(mongoInsert));
+	}
 
 	@Override
 	public <T> String execute(Into<T> into) {
 		MongoInsertResult result = into.to(mongoInsert);
-		
+		return insert(result);
+	}
+
+	private String insert(MongoInsertResult result) {
 		String collection = result.getCollection();
 		Document doc = result.getValue();
 		logger.info(collection + " insert " + doc.toJson());
@@ -219,10 +223,10 @@ public class DAOImpl implements DAO {
 		logger.info(collection + " delete " + r.getDeletedCount());
 	}
 	
-//	@Override
-//	public <R> void execute(BinderSQL<R> binder, R r) {
-//		NativeSQLResult result = binder.bind(r);
-//		execute(result.sqlValues(), result.values());
-//	}
+	@Override
+	public <R> String execute(InsertBinder<R> binder, R r) {
+		MongoInsertResult result = binder.bind(r);
+		return insert(result);
+	}
 	
 }
