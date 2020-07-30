@@ -2,7 +2,10 @@ package com.naskar.fluentquery.mongodb.converters;
 
 import org.bson.Document;
 
+import com.naskar.fluentquery.Join;
 import com.naskar.fluentquery.Predicate;
+
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 class MongoPredicate<T, R, I> implements Predicate<T, R, I> {
 
@@ -68,6 +71,18 @@ class MongoPredicate<T, R, I> implements Predicate<T, R, I> {
 	public I isNotNull() {
 		object.append(name, new Document("$ne", null));
 		return null;
+	}
+	
+	@Override
+	public <J> I in(Class<J> clazz, Join<J, T> action) {
+		// TODO: mongodb in
+		throw new NotImplementedException();
+	}
+	
+	@Override
+	public <J> I notIn(Class<J> clazz, Join<J, T> action) {
+		// TODO: mongodb notIn
+		throw new NotImplementedException();
 	}
 
 }
