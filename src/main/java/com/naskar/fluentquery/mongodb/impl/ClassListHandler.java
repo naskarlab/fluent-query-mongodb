@@ -66,8 +66,7 @@ public class ClassListHandler<T> implements DocumentHandler {
 				
 				if(f != null) {
 					f.setAccessible(true);
-					f.set(r, value); 
-					f.setAccessible(false);
+					f.set(r, value);
 				}
 				
 			}
