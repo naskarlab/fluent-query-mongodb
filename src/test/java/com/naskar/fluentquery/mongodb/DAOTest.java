@@ -51,7 +51,7 @@ public class DAOTest {
 		client.close();
 	}
 	
-	@Test
+	// @Test
 	public void testSuccessInsert() {
 		// Arrange
 		dao.execute(dao.insert(Customer.class)
@@ -76,7 +76,7 @@ public class DAOTest {
 		Assert.assertEquals("teste2", actual.get(1).getName());
 	}
 	
-	@Test
+	// @Test
 	public void testSuccessUpdate() {
 		// Arrange
 		String id = dao.execute(dao.insert(Customer.class)
@@ -100,7 +100,7 @@ public class DAOTest {
 		Assert.assertEquals("teste1-updated", actual.getName());
 	}
 	
-	@Test
+	// @Test
 	public void testSuccessDelete() {
 		// Arrange
 		String id = dao.execute(dao.insert(Customer.class)
@@ -126,7 +126,7 @@ public class DAOTest {
 		Assert.assertEquals(0, actual.size());
 	}
 
-	@Test
+	// @Test
 	public void testSuccessBinderInsert() {
 		InsertBinder<Customer> binder = dao.binderInsert(Customer.class);
 		
